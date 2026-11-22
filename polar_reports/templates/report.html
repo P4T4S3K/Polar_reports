@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  :root { --teal:#2c6e6f; --teal-dark:#235a5b; --fg:#1f2a2e; --muted:#7b878a; --card:#eef2f2; --line:#dfe5e6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9eded; font-family: "DejaVu Sans", "Segoe UI", Arial, sans-serif; color: var(--fg); font-size: 10.5px; }
+  .page { width: 210mm; min-height: 297mm; margin: 12px auto; background: #fff; position: relative; padding-bottom: 18mm; box-shadow: 0 1px 4px rgba(0,0,0,.15); page-break-after: always; break-after: page; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  @media print { body { background: #fff; } .page { margin: 0; box-shadow: none; } }
+  header { background: linear-gradient(90deg, var(--teal-dark), var(--teal)); color: #fff; padding: 9mm 12mm 6mm; display: flex; justify-content: space-between; }
+  header h1 { margin: 0 0 4px; font-size: 21px; letter-spacing: .5px; text-transform: uppercase; }
+  header .sub { font-size: 10px; opacity: .9; }
+  header .right { text-align: right; }
+  header .right .big { font-size: 15px; font-weight: bold; margin-bottom: 4px; }
+  .content { padding: 6mm 12mm 0; }
+  .kpis { display: flex; gap: 8px; margin-bottom: 6mm; }
+  .kpi { flex: 1; background: var(--card); border-radius: 5px; padding: 8px 10px; }
+  .kpi .l { font-size: 8px; font-weight: bold; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .kpi .v { font-size: 16px; font-weight: bold; margin: 5px 0 2px; }
+  .kpi .t { font-size: 8.5px; color: var(--muted); }
+  h2 { font-size: 13px; margin: 3mm 0 2mm; display: flex; align-items: center; gap: 7px; }
+  h2 .n { display: inline-block; width: 17px; height: 17px; border-radius: 50%; background: var(--teal); color: #fff; font-size: 9px; text-align: center; line-height: 17px; }
+  .chart { margin: 0 0 3mm 4mm; }
+  .row { display: flex; gap: 6mm; align-items: flex-start; }
+  .row > div { flex: 1; }
+  .radarbox { background: var(--card); border-radius: 6px; padding: 4px; max-width: 62mm; }
+  .summary h3 { font-size: 11px; margin: 4px 0; }
+  .summary p { line-height: 1.5; margin: 0 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 9px; }
+  th { background: var(--teal); color: #fff; text-align: left; padding: 4px 5px; font-weight: bold; }
+  td { padding: 3.5px 5px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  tr:nth-child(even) td { background: #f6f8f8; }
+  td.r, th.r { text-align: right; }
+  .pill { display: inline-block; min-width: 26px; text-align: center; color: #fff; border-radius: 3px; padding: 1px 4px; font-weight: bold; }
+  .mini td, .mini th { padding: 2px 5px; }
+  .note { color: var(--muted); font-size: 8.5px; margin-top: 3mm; line-height: 1.4; }
+  footer { position: absolute; left: 12mm; right: 12mm; bottom: 7mm; border-top: 1px solid var(--line); padding-top: 4px; display: flex; justify-content: space-between; color: var(--muted); font-size: 8px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+{% for p in pages %}
+<section class="page">
+{% if p.kind == "player_session" %}
+  <header>
+    <div><h1>{{ p.name }}</h1><div class="sub">{{ p.meta.title_line }}</div></div>
+    <div class="right"><div class="big">{% if p.number != "–" %}#{{ p.number }} · {% endif %}pořadí {{ p.rank }}/{{ p.meta.n }}</div>
+      <div class="sub">{{ p.meta.session_type }} · data: Polar Team Pro</div></div>
+  </header>
+  <div class="content">
+    <div class="kpis">{% for l, v, t in p.kpis %}<div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v }}</div><div class="t">{{ t }}</div></div>{% endfor %}</div>
+    <h2><span class="n">1</span>Tepová frekvence podle zón</h2>
+    <div class="chart">{{ p.hr_chart | safe }}</div>
+    <h2><span class="n">2</span>Rychlostní zóny</h2>
+    <div class="chart">{{ p.speed_chart | safe }}</div>
+    <h2><span class="n">3</span>Profil v týmu (percentily)</h2>
+    <div class="row">
+      <div class="radarbox">{{ p.radar | safe }}</div>
+      <div class="summary">
+        <h3>Shrnutí</h3>
+        <p>{{ p.summary }}</p>
+        <table class="mini"><tr><th>Ukazatel</th><th class="r">Percentil</th></tr>
+        {% for l, v in p.pct_rows %}<tr><td>{{ l }}</td><td class="r">{{ v }}</td></tr>{% endfor %}</table>
+      </div>
+    </div>
+  </div>
+  <footer><span>{{ p.footer }}</span><span>{{ p.meta.session | upper }} · {{ p.meta.time }}</span></footer>
+
+{% elif p.kind == "squad" %}
+  <header>
+    <div><h1>Report skupiny</h1><div class="sub">{{ p.meta.title_line }}</div></div>
+    <div class="right"><div class="big">{{ p.meta.session | upper }} · {{ p.meta.time }}</div>
+      <div class="sub">{{ p.meta.session_type }} · {{ p.meta.n }} hráček · data: Polar Team Pro</div></div>
+  </header>
+  <div class="content">
+    <div class="kpis">{% for l, v in p.kpis %}<div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v }}</div></div>{% endfor %}</div>
+    <h2><span class="n">1</span>Uběhnutá vzdálenost — celá skupina</h2>
+    <div class="chart">{{ p.dist_chart | safe }}</div>
+    <h2><span class="n">2</span>Zátěž a tepová frekvence — celá skupina</h2>
+    <div class="row"><div>{{ p.load_chart | safe }}</div><div>{{ p.hr_chart | safe }}</div></div>
+    <h2><span class="n">3</span>Data skupiny — podle čísla dresu</h2>
+    <div class="row">
+    {% for half in (p.table_left, p.table_right) %}
+      <div><table><tr><th>#</th><th>Jméno</th><th class="r">TF%</th><th class="r">Vzd.</th><th class="r">Max</th><th class="r">Sprt</th><th class="r">Zátěž</th></tr>
+      {% for r in half %}<tr><td>{{ r.number }}</td><td>{{ r.name }}</td><td class="r">{{ r.hr }}</td><td class="r">{{ r.dist }}</td><td class="r">{{ r.max }}</td><td class="r">{{ r.sprints }}</td><td class="r">{{ r.load }}</td></tr>{% endfor %}
+      </table></div>
+    {% endfor %}
+    </div>
+  </div>
+  <footer><span>{{ p.footer }}</span><span>{{ p.meta.session | upper }} · {{ p.meta.time }}</span></footer>
+
+{% elif p.kind == "squad_pct" %}
+  <header>
+    <div><h1>Porovnání percentilů</h1><div class="sub">{{ p.meta.title_line }}</div></div>
+    <div class="right"><div class="big">{{ p.meta.session | upper }} · {{ p.meta.time }}</div>
+      <div class="sub">{{ p.meta.n }} hráček · data: Polar Team Pro</div></div>
+  </header>
+  <div class="content">
+    <h2><span class="n">4</span>Paprskový graf — všechny hráčky (barva = celkový percentil)</h2>
+    <div class="row">
+      <div class="radarbox" style="max-width:80mm">{{ p.radar | safe }}</div>
+      <div>
+        <h3 style="font-size:11px;margin:4px 0 6px">Pořadí podle celkového percentilu</h3>
+        <table><tr><th>#</th><th>Hráčka</th>{% for l in p.metric_labels %}<th class="r">{{ l }}</th>{% endfor %}<th class="r">Celk.</th></tr>
+        {% for r in p.rows %}<tr><td>{{ r.rank }}</td><td>{{ r.name }}</td>{% for v in r.vals %}<td class="r">{{ v }}</td>{% endfor %}<td class="r"><span class="pill" style="background:{{ r.color }}">{{ r.overall }}</span></td></tr>{% endfor %}
+        </table>
+      </div>
+    </div>
+    <p class="note">Percentil 100 = nejlepší hodnota ve skupině v daném tréninku/zápase. „Celk.“ je průměr pěti percentilů
+      (zátěž, TF%, kardio zátěž, vzdálenost/min, sprinty) a určuje pořadí v tabulce.</p>
+  </div>
+  <footer><span>{{ p.footer }}</span><span>{{ p.meta.session | upper }} · {{ p.meta.time }}</span></footer>
+
+{% elif p.kind == "player_overview" %}
+  <header>
+    <div><h1>{{ p.name }}</h1><div class="sub">{{ p.meta.title_line }}</div></div>
+    <div class="right"><div class="big">{% if p.number and p.number != "–" %}#{{ p.number }} · {% endif %}Přehled za období</div>
+      <div class="sub">data: Polar Team Pro</div></div>
+  </header>
+  <div class="content">
+    <div class="kpis">{% for l, v in p.kpis %}<div class="kpi"><div class="l">{{ l }}</div><div class="v">{{ v }}</div></div>{% endfor %}</div>
+    <h2><span class="n">1</span>Podle typu tréninku — ty vs. průměr týmu</h2>
+    <table><tr><th>Typ</th><th class="r">Počet</th><th class="r">Vzdálenost [m]</th><th class="r">Zátěž</th><th class="r">Prům. TF%</th><th class="r">Max rychlost</th><th class="r">Prům. percentil</th></tr>
+    {% for r in p.type_rows %}<tr><td>{{ r.type }}</td><td class="r">{{ r.count }}</td>
+      <td class="r">{{ r.distance }} <span class="muted">/ {{ r.team_distance }}</span></td>
+      <td class="r">{{ r.load }} <span class="muted">/ {{ r.team_load }}</span></td>
+      <td class="r">{{ r.hr }} <span class="muted">/ {{ r.team_hr }}</span></td>
+      <td class="r">{{ r.speed }} <span class="muted">/ {{ r.team_speed }}</span></td>
+      <td class="r">{{ r.overall }}</td></tr>{% endfor %}
+    </table>
+    <p class="note">Hodnota hráčky / <span class="muted">průměr týmu</span> ve stejných trénincích.</p>
+    <h2><span class="n">2</span>Vývoj v čase</h2>
+    <div class="chart">{{ p.load_chart | safe }}</div>
+    <div class="chart">{{ p.dist_chart | safe }}</div>
+    <h2><span class="n">3</span>Tréninky a zápasy</h2>
+    <div class="row">
+      <div class="radarbox" style="max-width:52mm;flex:0 0 52mm">{{ p.radar | safe }}<div class="note" style="text-align:center;margin:0">průměrné percentily</div></div>
+      <div><table><tr><th>Datum</th><th>Typ</th><th class="r">Vzd.</th><th class="r">Zátěž</th><th class="r">TF%</th><th class="r">Max</th><th class="r">Sprt</th><th class="r">Pořadí</th><th class="r">Perc.</th></tr>
+      {% for r in p.sessions %}<tr><td>{{ r.date }}</td><td>{{ r.type }}</td><td class="r">{{ r.dist }}</td><td class="r">{{ r.load }}</td><td class="r">{{ r.hr }}</td><td class="r">{{ r.max }}</td><td class="r">{{ r.sprints }}</td><td class="r">{{ r.rank }}</td><td class="r"><span class="pill" style="background:{{ r.color }}">{{ r.overall }}</span></td></tr>{% endfor %}
+      </table></div>
+    </div>
+  </div>
+  <footer><span>{{ p.footer }}</span><span>Vytvořeno {{ generated }}</span></footer>
+{% endif %}
+</section>
+{% endfor %}
+</body>
+</html>
