@@ -36,6 +36,13 @@ def _context_word(session_type: str) -> tuple[str, str]:
     return ("v tomto zápase", "zápase") if session_type == MATCH else ("v tomto tréninku", "tréninku")
 
 
+def _team_note(stats: an.SessionStats, word: str) -> str:
+    groups = stats.comp["session_id"].nunique()
+    if groups > 1:
+        return f"„Tým“ = průměr všech {len(stats.comp)} hráček (všechny skupiny) v {word} tohoto dne."
+    return f"„Tým“ = průměr všech hráček v {word}."
+
+
 def _session_meta(rows: pd.DataFrame, team_name: str) -> dict:
     first = rows.iloc[0]
     start = first["session_start"]
@@ -52,11 +59,12 @@ def _session_meta(rows: pd.DataFrame, team_name: str) -> dict:
 
 # --------------------------------------------------------------------------- pages
 def player_session_page(df: pd.DataFrame, session_id: str, player: str, team_name: str = "",
-                        stats: an.SessionStats | None = None) -> dict:
-    stats = stats or an.session_stats(df, session_id)
+                        stats: an.SessionStats | None = None, scope: str = an.SCOPE_ALL) -> dict:
+    stats = stats or an.session_stats(df, session_id, scope)
     rows, pct, team = stats.rows, stats.pct, stats.team_avg
     me = rows[rows["player"] == player].iloc[0]
     meta = _session_meta(rows, team_name)
+    meta["n"] = len(pct)
     ctx, word = _context_word(meta["session_type"])
     p = pct.loc[player]
     radar_metrics = [m for m in an.PERCENTILE_METRICS if m in pct.columns]
@@ -85,13 +93,14 @@ def player_session_page(df: pd.DataFrame, session_id: str, player: str, team_nam
                               [p[m] for m in radar_metrics]),
         "pct_rows": [(an.PERCENTILE_METRICS[m][0], int(p[m])) for m in radar_metrics],
         "summary": an.summary_text(p, meta["n"], ctx),
-        "footer": f"Zdroj: export Polar Team Pro, {meta['date']}. „Tým“ = průměr všech hráček v {word}.",
+        "footer": f"Zdroj: export Polar Team Pro, {meta['date']}. {_team_note(stats, word)}",
     }
 
 
-def squad_pages(df: pd.DataFrame, session_id: str, team_name: str = "") -> list[dict]:
-    stats = an.session_stats(df, session_id)
-    rows, pct, team = stats.rows, stats.pct, stats.team_avg
+def squad_pages(df: pd.DataFrame, session_id: str, team_name: str = "",
+                scope: str = an.SCOPE_ALL) -> list[dict]:
+    stats = an.session_stats(df, session_id, scope)
+    rows, pct, team = stats.rows, stats.pct, stats.group_avg
     meta = _session_meta(rows, team_name)
     names = [an.short_name(n) for n in rows["player"]]
 
@@ -133,9 +142,11 @@ def squad_pages(df: pd.DataFrame, session_id: str, team_name: str = "") -> list[
         "table_right": table[half:],
         "footer": f"Zdroj: export Polar Team Pro, {meta['date']}. Přerušovaná čára = průměr skupiny.",
     }
+    own = set(rows["player"])
     page2 = {
         "kind": "squad_pct",
-        "meta": meta,
+        "meta": {**meta, "n": len(pct)},
+        "all_groups": stats.comp["session_id"].nunique() > 1,
         "radar": charts.radar_multi(
             [an.PERCENTILE_METRICS[m][0] for m in metrics],
             [(name, [r[m] for m in metrics], r["overall"]) for name, r in pct.iterrows()],
@@ -143,7 +154,7 @@ def squad_pages(df: pd.DataFrame, session_id: str, team_name: str = "") -> list[
         "metric_labels": [an.PERCENTILE_METRICS[m][0] for m in metrics],
         "rows": [
             {"rank": int(r["rank"]), "name": name, "vals": [int(r[m]) for m in metrics],
-             "overall": int(r["overall"]), "color": charts.heat(r["overall"])}
+             "overall": int(r["overall"]), "color": charts.heat(r["overall"]), "own": name in own}
             for name, r in pct.iterrows()
         ],
         "footer": f"Zdroj: export Polar Team Pro, {meta['date']}.",
@@ -151,8 +162,9 @@ def squad_pages(df: pd.DataFrame, session_id: str, team_name: str = "") -> list[
     return [page1, page2]
 
 
-def player_overview_page(df: pd.DataFrame, player: str, team_name: str = "") -> dict:
-    hist = an.player_history(df, player)
+def player_overview_page(df: pd.DataFrame, player: str, team_name: str = "",
+                         scope: str = an.SCOPE_ALL) -> dict:
+    hist = an.player_history(df, player, scope)
     by_type = an.type_summary(hist)
     labels = [f"{s:%d.%m.}" if pd.notna(s) else str(i + 1) for i, s in enumerate(hist["session_start"])]
     number = df.loc[df["player"] == player, "number"].dropna()
@@ -214,26 +226,26 @@ def render(pages: list[dict], title: str) -> str:
         pages=pages, title=title, generated=date.today().strftime("%d.%m.%Y"))
 
 
-def player_session_html(df, session_id, player, team_name="") -> str:
-    return render([player_session_page(df, session_id, player, team_name)], player)
+def player_session_html(df, session_id, player, team_name="", scope=an.SCOPE_ALL) -> str:
+    return render([player_session_page(df, session_id, player, team_name, scope=scope)], player)
 
 
-def session_players_html(df, session_id, team_name="") -> str:
+def session_players_html(df, session_id, team_name="", scope=an.SCOPE_ALL) -> str:
     """All individual pages of one session in one document."""
-    stats = an.session_stats(df, session_id)
+    stats = an.session_stats(df, session_id, scope)
     pages = [player_session_page(df, session_id, p, team_name, stats) for p in stats.rows["player"]]
     return render(pages, "Individuální reporty")
 
 
-def squad_html(df, session_id, team_name="") -> str:
-    return render(squad_pages(df, session_id, team_name), "Report skupiny")
+def squad_html(df, session_id, team_name="", scope=an.SCOPE_ALL) -> str:
+    return render(squad_pages(df, session_id, team_name, scope), "Report skupiny")
 
 
-def player_full_html(df, player, team_name="") -> str:
+def player_full_html(df, player, team_name="", scope=an.SCOPE_ALL) -> str:
     """Overview across all sessions + one page per session for the player."""
-    pages = [player_overview_page(df, player, team_name)]
-    for sid in an.player_history(df, player)["session_id"]:
-        pages.append(player_session_page(df, sid, player, team_name))
+    pages = [player_overview_page(df, player, team_name, scope)]
+    for sid in an.player_history(df, player, scope)["session_id"]:
+        pages.append(player_session_page(df, sid, player, team_name, scope=scope))
     return render(pages, player)
 
 

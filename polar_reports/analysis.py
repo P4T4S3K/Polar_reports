@@ -30,6 +30,20 @@ SPEED_ZONE_LABELS = [
 ]
 
 
+# comparison scope: all players of the same session type on the same day (both groups),
+# or only the players of the session itself (one group)
+SCOPE_ALL = "all"
+SCOPE_GROUP = "group"
+
+
+def assign_pools(df: pd.DataFrame) -> pd.DataFrame:
+    """Add a `pool` column: sessions of the same type on the same day are compared together."""
+    df = df.copy()
+    day = df["session_start"].dt.strftime("%d.%m.%Y").fillna("")
+    df["pool"] = day + " · " + df["session_type"].astype(str)
+    return df
+
+
 def short_name(full: str) -> str:
     """'Dora Vavrochová' -> 'Dora V.'"""
     parts = full.split()
@@ -57,6 +71,19 @@ def session_rows(df: pd.DataFrame, session_id: str) -> pd.DataFrame:
     return rows
 
 
+def comparison_rows(df: pd.DataFrame, session_id: str, scope: str = SCOPE_ALL) -> pd.DataFrame:
+    """Players a session is compared against (one row per player)."""
+    own = session_rows(df, session_id)
+    if scope == SCOPE_GROUP:
+        return own
+    if "pool" not in df.columns:
+        df = assign_pools(df)
+    pool = df.loc[df["session_id"] == session_id, "pool"].iloc[0]
+    others = df[(df["pool"] == pool) & (df["session_id"] != session_id)]
+    # a player present in two sessions of the pool counts once (her own session wins)
+    return pd.concat([own, others]).drop_duplicates(subset="player", keep="first")
+
+
 def percentiles(session_df: pd.DataFrame) -> pd.DataFrame:
     """Per-player percentiles for one session, plus overall score and rank."""
     metrics = [m for m in PERCENTILE_METRICS if m in session_df.columns]
@@ -72,14 +99,18 @@ def percentiles(session_df: pd.DataFrame) -> pd.DataFrame:
 
 @dataclass
 class SessionStats:
-    rows: pd.DataFrame          # one row per player
-    pct: pd.DataFrame           # percentiles indexed by player
-    team_avg: pd.Series         # mean of all numeric metrics in the session
+    rows: pd.DataFrame          # players of this session (one group)
+    comp: pd.DataFrame          # players compared against (all 40 or the group)
+    pct: pd.DataFrame           # percentiles over `comp`, indexed by player
+    team_avg: pd.Series         # mean of numeric metrics over `comp`
+    group_avg: pd.Series        # mean of numeric metrics over `rows`
 
 
-def session_stats(df: pd.DataFrame, session_id: str) -> SessionStats:
+def session_stats(df: pd.DataFrame, session_id: str, scope: str = SCOPE_ALL) -> SessionStats:
     rows = session_rows(df, session_id)
-    return SessionStats(rows, percentiles(rows), rows.mean(numeric_only=True))
+    comp = comparison_rows(df, session_id, scope)
+    return SessionStats(rows, comp, percentiles(comp), comp.mean(numeric_only=True),
+                        rows.mean(numeric_only=True))
 
 
 def zone_values(row: pd.Series, prefix: str) -> list[float]:
@@ -100,14 +131,15 @@ def summary_text(pct_row: pd.Series, n_players: int, context: str = "v tomto zá
     )
 
 
-def player_history(df: pd.DataFrame, player: str) -> pd.DataFrame:
+def player_history(df: pd.DataFrame, player: str, scope: str = SCOPE_ALL) -> pd.DataFrame:
     """Every session of one player with her values, team averages and percentiles."""
     out = []
-    for sid, srows in df.groupby("session_id", sort=False):
-        if player not in srows["player"].values:
+    for sid, own in df.groupby("session_id", sort=False):
+        if player not in own["player"].values:
             continue
+        srows = comparison_rows(df, sid, scope)
         pct = percentiles(srows)
-        me = srows[srows["player"] == player].iloc[0]
+        me = own[own["player"] == player].iloc[0]
         rec = {
             "session_id": sid,
             "session": me["session"],

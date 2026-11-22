@@ -104,3 +104,37 @@ def test_pdf(df):
     sid = an.sessions(df)["session_id"][0]
     pdf = report.to_pdf(report.player_session_html(df, sid, "Hráčka Tři"))
     assert pdf[:4] == b"%PDF"
+
+
+def _two_groups(df):
+    """Same match day, second group with other players (like 2 x 20 players)."""
+    a = df[df["session_type"] == ingest.MATCH].copy()
+    b = a.copy()
+    b["player"] = b["player"] + " B"
+    b["session_id"] = b["session_id"] + "_B"
+    b["session_start"] = b["session_start"] + pd.Timedelta(hours=2)
+    b["training_load"] = b["training_load"] + 500          # group B much higher load
+    return an.assign_pools(pd.concat([a, b], ignore_index=True))
+
+
+def test_compare_with_all_groups(df):
+    both = _two_groups(df)
+    sid = an.sessions(both)["session_id"][0]
+    all_stats = an.session_stats(both, sid, an.SCOPE_ALL)
+    grp_stats = an.session_stats(both, sid, an.SCOPE_GROUP)
+    assert len(all_stats.rows) == 6 and len(all_stats.pct) == 12
+    assert len(grp_stats.pct) == 6
+    # group B has the higher load, so group A players are at most 50th load percentile among all 12
+    assert all_stats.pct.loc[all_stats.rows["player"], "training_load"].max() == 50
+    assert grp_stats.pct["training_load"].max() == 100
+    hist = an.player_history(both, "Hráčka Jedna", an.SCOPE_ALL)
+    assert hist.loc[0, "players"] == 12
+
+
+def test_report_with_all_groups(df):
+    both = _two_groups(df)
+    sid = an.sessions(both)["session_id"][0]
+    html = report.player_session_html(both, sid, "Hráčka Jedna")
+    assert "/12" in html and "všech 12 hráček" in html
+    squad = report.squad_html(both, sid)
+    assert "obě skupiny" in squad

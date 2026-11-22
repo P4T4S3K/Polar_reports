@@ -6,3 +6,4 @@ reports/
 # real Polar exports contain personal data of players – never commit them
 data/
 *.pdf
+.streamlit/secrets.toml

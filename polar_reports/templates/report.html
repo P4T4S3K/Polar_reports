@@ -38,6 +38,8 @@
   td.r, th.r { text-align: right; }
   .pill { display: inline-block; min-width: 26px; text-align: center; color: #fff; border-radius: 3px; padding: 1px 4px; font-weight: bold; }
   .mini td, .mini th { padding: 2px 5px; }
+  table.compact td { padding: 1.5px 4px; font-size: 8.5px; }
+  tr.own td { font-weight: bold; }
   .note { color: var(--muted); font-size: 8.5px; margin-top: 3mm; line-height: 1.4; }
   footer { position: absolute; left: 12mm; right: 12mm; bottom: 7mm; border-top: 1px solid var(--line); padding-top: 4px; display: flex; justify-content: space-between; color: var(--muted); font-size: 8px; }
   .muted { color: var(--muted); }
@@ -101,17 +103,18 @@
       <div class="sub">{{ p.meta.n }} hráček · data: Polar Team Pro</div></div>
   </header>
   <div class="content">
-    <h2><span class="n">4</span>Paprskový graf — všechny hráčky (barva = celkový percentil)</h2>
+    <h2><span class="n">4</span>Paprskový graf — {% if p.all_groups %}všech {{ p.meta.n }} hráček (obě skupiny){% else %}všechny hráčky{% endif %} (barva = celkový percentil)</h2>
     <div class="row">
       <div class="radarbox" style="max-width:80mm">{{ p.radar | safe }}</div>
       <div>
         <h3 style="font-size:11px;margin:4px 0 6px">Pořadí podle celkového percentilu</h3>
-        <table><tr><th>#</th><th>Hráčka</th>{% for l in p.metric_labels %}<th class="r">{{ l }}</th>{% endfor %}<th class="r">Celk.</th></tr>
-        {% for r in p.rows %}<tr><td>{{ r.rank }}</td><td>{{ r.name }}</td>{% for v in r.vals %}<td class="r">{{ v }}</td>{% endfor %}<td class="r"><span class="pill" style="background:{{ r.color }}">{{ r.overall }}</span></td></tr>{% endfor %}
+        <table class="{{ 'compact' if p.rows|length > 24 }}"><tr><th>#</th><th>Hráčka</th>{% for l in p.metric_labels %}<th class="r">{{ l }}</th>{% endfor %}<th class="r">Celk.</th></tr>
+        {% for r in p.rows %}<tr class="{{ 'own' if p.all_groups and r.own }}"><td>{{ r.rank }}</td><td>{{ r.name }}</td>{% for v in r.vals %}<td class="r">{{ v }}</td>{% endfor %}<td class="r"><span class="pill" style="background:{{ r.color }}">{{ r.overall }}</span></td></tr>{% endfor %}
         </table>
       </div>
     </div>
-    <p class="note">Percentil 100 = nejlepší hodnota ve skupině v daném tréninku/zápase. „Celk.“ je průměr pěti percentilů
+    {% if p.all_groups %}<p class="note"><b>Tučně</b> = hráčky této skupiny. Porovnání zahrnuje všechny hráčky se stejným typem tréninku v tento den.</p>{% endif %}
+    <p class="note">Percentil 100 = nejlepší hodnota mezi porovnávanými hráčkami. „Celk.“ je průměr pěti percentilů
       (zátěž, TF%, kardio zátěž, vzdálenost/min, sprinty) a určuje pořadí v tabulce.</p>
   </div>
   <footer><span>{{ p.footer }}</span><span>{{ p.meta.session | upper }} · {{ p.meta.time }}</span></footer>

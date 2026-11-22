@@ -14,9 +14,16 @@ Každá hráčka vidí své statistiky a jak si stojí v porovnání s ostatním
 - **Report skupiny** za trénink: pořadí vzdálenosti, zátěže a TF, tabulka všech hráček, porovnání percentilů.
 - Export do **PDF** (jednotlivě nebo ZIP pro všechny hráčky).
 
+### S kým se hráčka porovnává
+
+Ve výchozím nastavení se hráčka porovnává se **všemi hráčkami, které měly stejný typ tréninku ve stejný den**
+(obě skupiny → 40 hráček). Pořadí, percentily i „průměr týmu“ se počítají z tohoto bloku.
+V aplikaci lze přepnout na porovnání jen s vlastní skupinou. Typ tréninku (Standardní / Dovednostní / Zápas)
+se vybírá nahoře v aplikaci a podle něj se tvoří reporty i hromadný export.
+
 ### Jak se počítají percentily
 
-V rámci jednoho tréninku/zápasu dostane každá hráčka pro každý ukazatel percentil
+V rámci porovnávaného bloku dostane každá hráčka pro každý ukazatel percentil
 `pořadí / počet hráček × 100` (nejlepší = 100, shodné hodnoty sdílí vyšší pořadí).
 Ukazatele: tréninková zátěž, průměrná TF %, kardio zátěž, vzdálenost/min, sprinty.
 Celkový percentil je jejich průměr a určuje pořadí.
@@ -31,6 +38,17 @@ streamlit run app.py
 PDF export používá WeasyPrint, který potřebuje systémové knihovny Pango
 (Linux: `apt install libpango-1.0-0 libpangoft2-1.0-0`, macOS: `brew install pango`,
 Windows: viz dokumentace WeasyPrint). Pro Streamlit Community Cloud je připraven `packages.txt`.
+
+### Online pro trenéry (Streamlit Community Cloud)
+
+1. Na [share.streamlit.io](https://share.streamlit.io) se přihlaste přes GitHub a zvolte *Create app* → tento repozitář, soubor `app.py`.
+2. V *Advanced settings → Secrets* nastavte heslo:
+   ```toml
+   APP_PASSWORD = "zvolte-silne-heslo"
+   ```
+3. Odkaz a heslo dejte jen trenérům. Data se do aplikace jen nahrávají a nikde se neukládají.
+
+Bez nastaveného `APP_PASSWORD` aplikace heslo nevyžaduje (vhodné pro spuštění na vlastním počítači).
 
 Příkazová řádka (bez webu):
 
